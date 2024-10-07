@@ -1,9 +1,7 @@
 import curses
 import time
+import paramiko
 import random
-
-from directory_selector import directory_selection_ui
-
 
 def draw_starfield(stdscr, num_stars=50, duration=3):
     """Draw an animated starfield for a specified duration."""
@@ -27,14 +25,15 @@ def draw_starfield(stdscr, num_stars=50, duration=3):
         time.sleep(0.1)
 
 def load_ascii_art(filename='ascii-art.txt'):
+    """Load ASCII art from a file."""
     try:
         with open(filename, 'r') as f:
             return [line.rstrip() for line in f]
     except FileNotFoundError:
         return ["ASCII ART", "NOT FOUND"]
 
-
 def draw_ascii_art(stdscr, start_y, start_x, max_height, max_width):
+    """Draw the ASCII art on the screen."""
     ascii_art = load_ascii_art()
     for i, line in enumerate(ascii_art):
         if i >= max_height:
@@ -45,6 +44,7 @@ def draw_ascii_art(stdscr, start_y, start_x, max_height, max_width):
             pass
 
 def draw_login_page(stdscr, username=""):
+    """Draw the login UI with ASCII art on the left and input fields on the right."""
     stdscr.clear()
     height, width = stdscr.getmaxyx()
     mid_x = width // 2
@@ -100,6 +100,7 @@ def draw_login_page(stdscr, username=""):
     return input_start_y, input_start_x + 10  # Return positions for input fields
 
 def get_input(stdscr, y, x, hidden=False, prefill_text=""):
+    """Get user input, optionally hiding the characters (for passwords)."""
     curses.curs_set(1)  # Show cursor
     input_value = list(prefill_text)
     max_length = 20
@@ -137,6 +138,7 @@ def get_input(stdscr, y, x, hidden=False, prefill_text=""):
     return ''.join(input_value)
 
 def loading_bar_animation(stdscr, y, x, width):
+    """Simulate a loading bar during authentication."""
     for i in range(width + 1):
         try:
             stdscr.addstr(y, x, f"[{'=' * i}{' ' * (width - i)}]")
@@ -147,15 +149,18 @@ def loading_bar_animation(stdscr, y, x, width):
         time.sleep(0.05)
 
 def attempt_ssh_login(username, password):
-    """Simulate SSH login attempt."""
-    time.sleep(2)  # Simulate network delay
-    return random.choice([True, False])  # Randomly succeed or fail for demonstration
-
+    """Attempt SSH login."""
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    try:
+        ssh.connect('172.16.0.10', username=username, password=password)
+        return ssh  # Return SSH client if login is successful
+    except paramiko.AuthenticationException:
+        return None
 
 def login_ui(stdscr):
+    """Main function to handle the login UI and SSH login."""
     curses.curs_set(0)
-
-    # Start with the starfield animation
     draw_starfield(stdscr, num_stars=100, duration=3)
 
     username = ""
@@ -168,51 +173,26 @@ def login_ui(stdscr):
             username = get_input(stdscr, input_y, input_x)
         password = get_input(stdscr, input_y + 2, input_x, hidden=True)
 
-        # Clear the right side for loading bar
-        height, width = stdscr.getmaxyx()
-        mid_x = width // 2
-        for y in range(height):
-            try:
-                stdscr.addstr(y, mid_x + 1, " " * (width - mid_x - 1))
-            except curses.error:
-                pass
+        # Add loading animation before attempting login
+        loading_bar_animation(stdscr, input_y + 4, input_x, 20)
 
-        # Show loading bar
-        loading_bar_width = min(30, width - mid_x - 4)
-        loading_bar_animation(stdscr, height // 2, mid_x + 2, loading_bar_width)
+        ssh_client = attempt_ssh_login(username, password)
 
-        login_result = attempt_ssh_login(username, password)
-
-        if login_result:
+        if ssh_client:
             stdscr.clear()
+            height, width = stdscr.getmaxyx()
             success_msg = f"ACCESS GRANTED. WELCOME, {username.upper()}!"
             try:
-                stdscr.addstr(height // 2, (width - len(success_msg)) // 2, success_msg,
-                              curses.color_pair(2) | curses.A_BOLD)
+                stdscr.addstr(height // 2, (width - len(success_msg)) // 2, success_msg, curses.color_pair(2) | curses.A_BOLD)
             except curses.error:
                 pass
             stdscr.refresh()
             time.sleep(2)
+            return ssh_client, username  # Return the username on successful login
 
-            # Call the directory selection UI after a successful login
-            directory_selection_ui(stdscr, username)
-            return  # Exit the login function
-
-        error_msg = f"ACCESS DENIED. ATTEMPT {attempt + 1}/{max_attempts}. RETRY?"
-        try:
-            stdscr.addstr(height - 4, mid_x + (width - mid_x - len(error_msg)) // 2, error_msg,
-                          curses.color_pair(3) | curses.A_BOLD)
-        except curses.error:
-            pass
+        stdscr.clear()
+        stdscr.addstr(5, 5, "Login failed. Please try again.", curses.color_pair(3) | curses.A_BOLD)
         stdscr.refresh()
-        time.sleep(1.5)
+        time.sleep(2)
 
-    stdscr.clear()
-    final_msg = "MAXIMUM ATTEMPTS EXCEEDED. SYSTEM LOCKED."
-    try:
-        stdscr.addstr(height // 2, (width - len(final_msg)) // 2, final_msg, curses.color_pair(3) | curses.A_BOLD)
-    except curses.error:
-        pass
-    stdscr.refresh()
-    stdscr.getch()
-
+    return None, None  # Return None if login fails
