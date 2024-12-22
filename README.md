@@ -22,8 +22,9 @@
 
 1. **Clone the Repository**  
    ```bash
-   git clone https://github.com/yourusername/servx.git
+   git clone https://github.com/ssudhanshu488/servx.git
    cd servx
+   cd FinalProject
    ```  
 
 2. **Install Dependencies**  
