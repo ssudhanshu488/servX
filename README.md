@@ -36,7 +36,7 @@
 3. **Run the Application**  
    Start the ServX application using:  
    ```bash
-   python servx.py
+   python main.py
    ```  
 
 ---
